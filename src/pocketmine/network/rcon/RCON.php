@@ -62,7 +62,7 @@ class RCON{
 
 		socket_set_block($this->socket);
 
-		$this->instance = new RCONInstance($this->socket, $this->password, $this->maxClients);
+		$this->instance = new RCONInstance($this->socket, $this->password, $this->maxClients, $this->server->getLogger());
 
 		socket_getsockname($this->socket, $addr, $port);
 		$this->server->getLogger()->info("RCON running on $addr:$port");
@@ -78,29 +78,21 @@ class RCON{
 
 	public function check(){
 		if($this->instance->isTerminated()){
-			$this->instance = new RCONInstance($this->socket, $this->password, $this->maxClients);
+			$this->instance = new RCONInstance($this->socket, $this->password, $this->maxClients, $this->server->getLogger());
 		}elseif($this->instance->isWaiting()){
-			if($this->instance->response !== ""){
-				$this->server->getLogger()->info($this->instance->response);
-				$this->instance->synchronized(function(RCONInstance $thread){
-					$thread->notify();
-				}, $this->instance);
-			}else{
+			$response = new RemoteConsoleCommandSender();
+			$command = $this->instance->cmd;
 
-				$response = new RemoteConsoleCommandSender();
-				$command = $this->instance->cmd;
+			$this->server->getPluginManager()->callEvent($ev = new RemoteServerCommandEvent($response, $command));
 
-				$this->server->getPluginManager()->callEvent($ev = new RemoteServerCommandEvent($response, $command));
-
-				if(!$ev->isCancelled()){
-					$this->server->dispatchCommand($ev->getSender(), $ev->getCommand());
-				}
-
-				$this->instance->response = TextFormat::clean($response->getMessage());
-				$this->instance->synchronized(function(RCONInstance $thread){
-					$thread->notify();
-				}, $this->instance);
+			if(!$ev->isCancelled()){
+				$this->server->dispatchCommand($ev->getSender(), $ev->getCommand());
 			}
+
+			$this->instance->response = TextFormat::clean($response->getMessage());
+			$this->instance->synchronized(function(RCONInstance $thread){
+				$thread->notify();
+			}, $this->instance);
 		}
 	}
 

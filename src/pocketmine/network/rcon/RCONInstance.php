@@ -46,23 +46,28 @@ class RCONInstance extends Thread{
 	private $maxClients;
 	/** @var bool */
 	private $waiting;
+	/** @var \ThreadedLogger */
+	private $logger;
 
 	public function isWaiting(){
 		return $this->waiting;
 	}
 
 	/**
-	 * @param resource $socket
-	 * @param string   $password
-	 * @param int      $maxClients
+	 * @param resource        $socket
+	 * @param string          $password
+	 * @param int             $maxClients
+	 * @param \ThreadedLogger $logger
 	 */
-	public function __construct($socket, string $password, int $maxClients = 50){
+	public function __construct($socket, string $password, int $maxClients = 50, \ThreadedLogger $logger){
 		$this->stop = false;
 		$this->cmd = "";
 		$this->response = "";
 		$this->socket = $socket;
 		$this->password = $password;
 		$this->maxClients = $maxClients;
+		$this->logger = $logger;
+
 		for($n = 0; $n < $this->maxClients; ++$n){
 			$this->{"client" . $n} = null;
 			$this->{"status" . $n} = self::STATUS_DISCONNECTED;
@@ -158,13 +163,7 @@ class RCONInstance extends Thread{
 								}
 								if($payload === $this->password){
 									socket_getpeername($client, $addr, $port);
-									$this->response = "[INFO] Successful Rcon connection from: /$addr:$port";
-									$this->synchronized(function(){
-										$this->waiting = true;
-										$this->wait();
-									});
-									$this->waiting = false;
-									$this->response = "";
+									$this->logger->info("Successful Rcon connection from: /$addr:$port");
 									$this->writePacket($client, $requestID, 2, "");
 									$this->{"status" . $n} = self::STATUS_CONNECTED;
 								}else{
