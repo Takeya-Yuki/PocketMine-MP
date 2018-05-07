@@ -145,7 +145,8 @@ class RCONInstance extends Thread{
 							}
 						}
 					}elseif($sock === $this->ipcSocket){
-						//do nothing, socket got closed from main thread to signal exit
+						//read dummy data
+						socket_read($sock, 65535);
 					}else{
 						$p = $this->readPacket($sock, $requestID, $packetType, $payload);
 						if($p === false){
