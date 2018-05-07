@@ -39,14 +39,13 @@ class RCON{
 	private $socket;
 	/** @var string */
 	private $password;
-	/** @var int */
-	private $threads;
-	/** @var RCONInstance[] */
-	private $workers = [];
-	/** @var int */
-	private $clientsPerThread;
 
-	public function __construct(Server $server, string $password, int $port = 19132, string $interface = "0.0.0.0", int $threads = 1, int $clientsPerThread = 50){
+	/** @var RCONInstance */
+	private $instance;
+	/** @var int */
+	private $maxClients;
+
+	public function __construct(Server $server, string $password, int $port = 19132, string $interface = "0.0.0.0", int $maxClients = 50){
 		$this->server = $server;
 		$this->password = $password;
 		$this->server->getLogger()->info("Starting remote control listener");
@@ -54,8 +53,7 @@ class RCON{
 			throw new \InvalidArgumentException("Empty password");
 		}
 
-		$this->threads = (int) max(1, $threads);
-		$this->clientsPerThread = (int) max(1, $clientsPerThread);
+		$this->maxClients = (int) max(1, $maxClients);
 		$this->socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
 
 		if($this->socket === false or !@socket_bind($this->socket, $interface, $port) or !@socket_listen($this->socket)){
@@ -64,50 +62,44 @@ class RCON{
 
 		socket_set_block($this->socket);
 
-		for($n = 0; $n < $this->threads; ++$n){
-			$this->workers[$n] = new RCONInstance($this->socket, $this->password, $this->clientsPerThread);
-		}
+		$this->instance = new RCONInstance($this->socket, $this->password, $this->maxClients);
 
 		socket_getsockname($this->socket, $addr, $port);
 		$this->server->getLogger()->info("RCON running on $addr:$port");
 	}
 
 	public function stop(){
-		for($n = 0; $n < $this->threads; ++$n){
-			$this->workers[$n]->close();
-			Server::microSleep(50000);
-			$this->workers[$n]->quit();
-		}
+		$this->instance->close();
+		Server::microSleep(50000);
+		$this->instance->quit();
+
 		@socket_close($this->socket);
-		$this->threads = 0;
 	}
 
 	public function check(){
-		for($n = 0; $n < $this->threads; ++$n){
-			if($this->workers[$n]->isTerminated()){
-				$this->workers[$n] = new RCONInstance($this->socket, $this->password, $this->clientsPerThread);
-			}elseif($this->workers[$n]->isWaiting()){
-				if($this->workers[$n]->response !== ""){
-					$this->server->getLogger()->info($this->workers[$n]->response);
-					$this->workers[$n]->synchronized(function(RCONInstance $thread){
-						$thread->notify();
-					}, $this->workers[$n]);
-				}else{
+		if($this->instance->isTerminated()){
+			$this->instance = new RCONInstance($this->socket, $this->password, $this->maxClients);
+		}elseif($this->instance->isWaiting()){
+			if($this->instance->response !== ""){
+				$this->server->getLogger()->info($this->instance->response);
+				$this->instance->synchronized(function(RCONInstance $thread){
+					$thread->notify();
+				}, $this->instance);
+			}else{
 
-					$response = new RemoteConsoleCommandSender();
-					$command = $this->workers[$n]->cmd;
+				$response = new RemoteConsoleCommandSender();
+				$command = $this->instance->cmd;
 
-					$this->server->getPluginManager()->callEvent($ev = new RemoteServerCommandEvent($response, $command));
+				$this->server->getPluginManager()->callEvent($ev = new RemoteServerCommandEvent($response, $command));
 
-					if(!$ev->isCancelled()){
-						$this->server->dispatchCommand($ev->getSender(), $ev->getCommand());
-					}
-
-					$this->workers[$n]->response = TextFormat::clean($response->getMessage());
-					$this->workers[$n]->synchronized(function(RCONInstance $thread){
-						$thread->notify();
-					}, $this->workers[$n]);
+				if(!$ev->isCancelled()){
+					$this->server->dispatchCommand($ev->getSender(), $ev->getCommand());
 				}
+
+				$this->instance->response = TextFormat::clean($response->getMessage());
+				$this->instance->synchronized(function(RCONInstance $thread){
+					$thread->notify();
+				}, $this->instance);
 			}
 		}
 	}
