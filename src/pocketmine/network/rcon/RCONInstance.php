@@ -68,12 +68,6 @@ class RCONInstance extends Thread{
 		$this->maxClients = $maxClients;
 		$this->logger = $logger;
 
-		for($n = 0; $n < $this->maxClients; ++$n){
-			$this->{"client" . $n} = null;
-			$this->{"status" . $n} = self::STATUS_DISCONNECTED;
-			$this->{"timeout" . $n} = 0;
-		}
-
 		$this->start(PTHREADS_INHERIT_NONE);
 	}
 
@@ -86,7 +80,6 @@ class RCONInstance extends Thread{
 	}
 
 	private function readPacket($client, &$requestID, &$packetType, &$payload){
-		socket_set_nonblock($client);
 		$d = socket_read($client, 4);
 		if($this->stop){
 			return false;
@@ -95,7 +88,7 @@ class RCONInstance extends Thread{
 		}elseif($d === "" or strlen($d) < 4){
 			return false;
 		}
-		socket_set_block($client);
+
 		$size = Binary::readLInt($d);
 		if($size < 0 or $size > 65535){
 			return false;
@@ -112,44 +105,46 @@ class RCONInstance extends Thread{
 
 	public function run(){
 		$this->registerClassLoader();
+
+		/** @var resource[] $clients */
+		$clients = [];
+		/** @var int[] $statuses */
+		$statuses = [];
+		/** @var float[] $timeouts */
+		$timeouts = [];
+
+		/** @var int $nextClientId */
+		$nextClientId = 0;
+
 		while(!$this->stop){
-			$this->synchronized(function(){
-				$this->wait(2000);
-			});
-			$r = [$socket = $this->socket];
+			$r = $clients;
+			$r["main"] = $this->socket; //this is ugly, but we need to be able to mass-select()
 			$w = null;
 			$e = null;
-			if(socket_select($r, $w, $e, 0) === 1){
-				if(($client = socket_accept($this->socket)) !== false){
-					socket_set_block($client);
-					socket_set_option($client, SOL_SOCKET, SO_KEEPALIVE, 1);
-					$done = false;
-					for($n = 0; $n < $this->maxClients; ++$n){
-						if($this->{"client" . $n} === null){
-							$this->{"client" . $n} = $client;
-							$this->{"status" . $n} = self::STATUS_AUTHENTICATING;
-							$this->{"timeout" . $n} = microtime(true) + 5;
-							$done = true;
-							break;
-						}
-					}
-					if(!$done){
-						@socket_close($client);
-					}
-				}
-			}
 
-			for($n = 0; $n < $this->maxClients; ++$n){
-				$client = &$this->{"client" . $n};
-				if($client !== null){
-					if($this->{"status" . $n} !== self::STATUS_DISCONNECTED and !$this->stop){
-						if($this->{"status" . $n} === self::STATUS_AUTHENTICATING and $this->{"timeout" . $n} < microtime(true)){ //Timeout
-							$this->{"status" . $n} = self::STATUS_DISCONNECTED;
-							continue;
+			$dead = $clients;
+
+			if(socket_select($r, $w, $e, 0, 200000) > 0){
+				foreach($r as $id => $sock){
+					unset($dead[$id]);
+					if($sock === $this->socket){
+						if(($client = socket_accept($this->socket)) !== false){
+							if(count($clients) >= $this->maxClients){
+								@socket_close($client);
+							}else{
+								socket_set_block($client);
+								socket_set_option($client, SOL_SOCKET, SO_KEEPALIVE, 1);
+
+								$id = $nextClientId++;
+								$clients[$id] = $client;
+								$statuses[$id] = self::STATUS_AUTHENTICATING;
+								$timeouts[$id] = microtime(true) + 5;
+							}
 						}
-						$p = $this->readPacket($client, $requestID, $packetType, $payload);
+					}else{
+						$p = $this->readPacket($sock, $requestID, $packetType, $payload);
 						if($p === false){
-							$this->{"status" . $n} = self::STATUS_DISCONNECTED;
+							$statuses[$id] = self::STATUS_DISCONNECTED;
 							continue;
 						}elseif($p === null){
 							continue;
@@ -157,23 +152,23 @@ class RCONInstance extends Thread{
 
 						switch($packetType){
 							case 3: //Login
-								if($this->{"status" . $n} !== self::STATUS_AUTHENTICATING){
-									$this->{"status" . $n} = self::STATUS_DISCONNECTED;
+								if($statuses[$id] !== self::STATUS_AUTHENTICATING){
+									$statuses[$id] = self::STATUS_DISCONNECTED;
 									break;
 								}
 								if($payload === $this->password){
-									socket_getpeername($client, $addr, $port);
+									socket_getpeername($sock, $addr, $port);
 									$this->logger->info("Successful Rcon connection from: /$addr:$port");
-									$this->writePacket($client, $requestID, 2, "");
-									$this->{"status" . $n} = self::STATUS_CONNECTED;
+									$this->writePacket($sock, $requestID, 2, "");
+									$statuses[$id] = self::STATUS_CONNECTED;
 								}else{
-									$this->{"status" . $n} = self::STATUS_DISCONNECTED;
-									$this->writePacket($client, -1, 2, "");
+									$statuses[$id] = self::STATUS_DISCONNECTED;
+									$this->writePacket($sock, -1, 2, "");
 								}
 								break;
 							case 2: //Command
-								if($this->{"status" . $n} !== self::STATUS_CONNECTED){
-									$this->{"status" . $n} = self::STATUS_DISCONNECTED;
+								if($statuses[$id] !== self::STATUS_CONNECTED){
+									$statuses[$id] = self::STATUS_DISCONNECTED;
 									break;
 								}
 								if(strlen($payload) > 0){
@@ -183,22 +178,30 @@ class RCONInstance extends Thread{
 										$this->wait();
 									});
 									$this->waiting = false;
-									$this->writePacket($client, $requestID, 0, str_replace("\n", "\r\n", trim($this->response)));
+									$this->writePacket($sock, $requestID, 0, str_replace("\n", "\r\n", trim($this->response)));
 									$this->response = "";
 									$this->cmd = "";
 								}
 								break;
 						}
-
-					}else{
-						@socket_set_option($client, SOL_SOCKET, SO_LINGER, ["l_onoff" => 1, "l_linger" => 1]);
-						@socket_shutdown($client, 2);
-						@socket_set_block($client);
-						@socket_read($client, 1);
-						@socket_close($client);
-						$this->{"status" . $n} = self::STATUS_DISCONNECTED;
-						$this->{"client" . $n} = null;
 					}
+				}
+			}
+
+			foreach($dead as $id => $client){
+				if($statuses[$id] !== self::STATUS_DISCONNECTED and !$this->stop){
+					if($statuses[$id] === self::STATUS_AUTHENTICATING and $timeouts[$id] < microtime(true)){ //Timeout
+						$statuses[$id] = self::STATUS_DISCONNECTED;
+						continue;
+					}
+				}else{
+					@socket_set_option($client, SOL_SOCKET, SO_LINGER, ["l_onoff" => 1, "l_linger" => 1]);
+					@socket_shutdown($client, 2);
+					@socket_set_block($client);
+					@socket_read($client, 1);
+					@socket_close($client);
+
+					unset($clients[$id], $statuses[$id], $timeouts[$id]);
 				}
 			}
 		}
