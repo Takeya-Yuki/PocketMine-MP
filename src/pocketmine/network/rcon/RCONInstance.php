@@ -47,6 +47,8 @@ class RCONInstance extends Thread{
 	private $waiting;
 	/** @var \ThreadedLogger */
 	private $logger;
+	/** @var resource */
+	private $ipcSocket;
 
 	public function isWaiting(){
 		return $this->waiting;
@@ -57,8 +59,9 @@ class RCONInstance extends Thread{
 	 * @param string          $password
 	 * @param int             $maxClients
 	 * @param \ThreadedLogger $logger
+	 * @param resource        $ipcSocket
 	 */
-	public function __construct($socket, string $password, int $maxClients = 50, \ThreadedLogger $logger){
+	public function __construct($socket, string $password, int $maxClients = 50, \ThreadedLogger $logger, $ipcSocket){
 		$this->stop = false;
 		$this->cmd = "";
 		$this->response = "";
@@ -66,6 +69,7 @@ class RCONInstance extends Thread{
 		$this->password = $password;
 		$this->maxClients = $maxClients;
 		$this->logger = $logger;
+		$this->ipcSocket = $ipcSocket;
 
 		$this->start(PTHREADS_INHERIT_NONE);
 	}
@@ -118,12 +122,13 @@ class RCONInstance extends Thread{
 		while(!$this->stop){
 			$r = $clients;
 			$r["main"] = $this->socket; //this is ugly, but we need to be able to mass-select()
+			$r["ipc"] = $this->ipcSocket;
 			$w = null;
 			$e = null;
 
 			$disconnect = [];
 
-			if(socket_select($r, $w, $e, 0, 200000) > 0){
+			if(socket_select($r, $w, $e, null) > 0){
 				foreach($r as $id => $sock){
 					if($sock === $this->socket){
 						if(($client = socket_accept($this->socket)) !== false){
@@ -139,6 +144,9 @@ class RCONInstance extends Thread{
 								$timeouts[$id] = microtime(true) + 5;
 							}
 						}
+					}elseif($sock === $this->ipcSocket){
+						//read dummy data
+						socket_read($sock, 65535);
 					}else{
 						$p = $this->readPacket($sock, $requestID, $packetType, $payload);
 						if($p === false){

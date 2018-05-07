@@ -31,6 +31,7 @@ use pocketmine\command\RemoteConsoleCommandSender;
 use pocketmine\event\server\RemoteServerCommandEvent;
 use pocketmine\Server;
 use pocketmine\utils\TextFormat;
+use pocketmine\utils\Utils;
 
 class RCON{
 	/** @var Server */
@@ -44,6 +45,11 @@ class RCON{
 	private $instance;
 	/** @var int */
 	private $maxClients;
+
+	/** @var resource */
+	private $ipcMainSocket;
+	/** @var resource */
+	private $ipcThreadSocket;
 
 	public function __construct(Server $server, string $password, int $port = 19132, string $interface = "0.0.0.0", int $maxClients = 50){
 		$this->server = $server;
@@ -62,7 +68,12 @@ class RCON{
 
 		socket_set_block($this->socket);
 
-		$this->instance = new RCONInstance($this->socket, $this->password, $this->maxClients, $this->server->getLogger());
+		if(!@socket_create_pair(Utils::getOS() === "win" ? AF_INET : AF_UNIX, SOCK_STREAM, 0, $ipc)){
+			throw new \RuntimeException(trim(socket_strerror(socket_last_error())));
+		}
+		[$this->ipcMainSocket, $this->ipcThreadSocket] = $ipc;
+
+		$this->instance = new RCONInstance($this->socket, $this->password, $this->maxClients, $this->server->getLogger(), $this->ipcThreadSocket);
 
 		socket_getsockname($this->socket, $addr, $port);
 		$this->server->getLogger()->info("RCON running on $addr:$port");
@@ -70,15 +81,18 @@ class RCON{
 
 	public function stop(){
 		$this->instance->close();
+		socket_write($this->ipcMainSocket, "\x00"); //make select() return
 		Server::microSleep(50000);
 		$this->instance->quit();
 
 		@socket_close($this->socket);
+		@socket_close($this->ipcMainSocket);
+		@socket_close($this->ipcThreadSocket);
 	}
 
 	public function check(){
 		if($this->instance->isTerminated()){
-			$this->instance = new RCONInstance($this->socket, $this->password, $this->maxClients, $this->server->getLogger());
+			$this->instance = new RCONInstance($this->socket, $this->password, $this->maxClients, $this->server->getLogger(), $this->ipcThreadSocket);
 		}elseif($this->instance->isWaiting()){
 			$response = new RemoteConsoleCommandSender();
 			$command = $this->instance->cmd;
