@@ -27,7 +27,6 @@ use pocketmine\Thread;
 use pocketmine\utils\Binary;
 
 class RCONInstance extends Thread{
-	private const STATUS_DISCONNECTED = -1;
 	private const STATUS_AUTHENTICATING = 0;
 	private const STATUS_CONNECTED = 1;
 
@@ -122,11 +121,10 @@ class RCONInstance extends Thread{
 			$w = null;
 			$e = null;
 
-			$dead = $clients;
+			$disconnect = [];
 
 			if(socket_select($r, $w, $e, 0, 200000) > 0){
 				foreach($r as $id => $sock){
-					unset($dead[$id]);
 					if($sock === $this->socket){
 						if(($client = socket_accept($this->socket)) !== false){
 							if(count($clients) >= $this->maxClients){
@@ -144,7 +142,7 @@ class RCONInstance extends Thread{
 					}else{
 						$p = $this->readPacket($sock, $requestID, $packetType, $payload);
 						if($p === false){
-							$statuses[$id] = self::STATUS_DISCONNECTED;
+							$disconnect[$id] = $sock;
 							continue;
 						}elseif($p === null){
 							continue;
@@ -153,7 +151,7 @@ class RCONInstance extends Thread{
 						switch($packetType){
 							case 3: //Login
 								if($statuses[$id] !== self::STATUS_AUTHENTICATING){
-									$statuses[$id] = self::STATUS_DISCONNECTED;
+									$disconnect[$id] = $sock;
 									break;
 								}
 								if($payload === $this->password){
@@ -162,13 +160,13 @@ class RCONInstance extends Thread{
 									$this->writePacket($sock, $requestID, 2, "");
 									$statuses[$id] = self::STATUS_CONNECTED;
 								}else{
-									$statuses[$id] = self::STATUS_DISCONNECTED;
+									$disconnect[$id] = $sock;
 									$this->writePacket($sock, -1, 2, "");
 								}
 								break;
 							case 2: //Command
 								if($statuses[$id] !== self::STATUS_CONNECTED){
-									$statuses[$id] = self::STATUS_DISCONNECTED;
+									$disconnect[$id] = $sock;
 									break;
 								}
 								if(strlen($payload) > 0){
@@ -188,21 +186,20 @@ class RCONInstance extends Thread{
 				}
 			}
 
-			foreach($dead as $id => $client){
-				if($statuses[$id] !== self::STATUS_DISCONNECTED and !$this->stop){
-					if($statuses[$id] === self::STATUS_AUTHENTICATING and $timeouts[$id] < microtime(true)){ //Timeout
-						$statuses[$id] = self::STATUS_DISCONNECTED;
-						continue;
-					}
-				}else{
-					@socket_set_option($client, SOL_SOCKET, SO_LINGER, ["l_onoff" => 1, "l_linger" => 1]);
-					@socket_shutdown($client, 2);
-					@socket_set_block($client);
-					@socket_read($client, 1);
-					@socket_close($client);
-
-					unset($clients[$id], $statuses[$id], $timeouts[$id]);
+			foreach($statuses as $id => $status){
+				if(!isset($disconnect[$id]) and $statuses[$id] === self::STATUS_AUTHENTICATING and $timeouts[$id] < microtime(true)){ //Timeout
+					$disconnect[$id] = $clients[$id];
 				}
+			}
+
+			foreach($disconnect as $id => $client){
+				@socket_set_option($client, SOL_SOCKET, SO_LINGER, ["l_onoff" => 1, "l_linger" => 1]);
+				@socket_shutdown($client, 2);
+				@socket_set_block($client);
+				@socket_read($client, 1);
+				@socket_close($client);
+
+				unset($clients[$id], $statuses[$id], $timeouts[$id]);
 			}
 		}
 	}
