@@ -81,13 +81,15 @@ class RCON{
 
 	public function stop(){
 		$this->instance->close();
-		socket_write($this->ipcMainSocket, "\x00"); //make select() return
+
+		//makes select() return on RCON thread
+		@socket_close($this->ipcMainSocket);
+		@socket_close($this->ipcThreadSocket);
+
 		Server::microSleep(50000);
 		$this->instance->quit();
 
 		@socket_close($this->socket);
-		@socket_close($this->ipcMainSocket);
-		@socket_close($this->ipcThreadSocket);
 	}
 
 	public function check(){
