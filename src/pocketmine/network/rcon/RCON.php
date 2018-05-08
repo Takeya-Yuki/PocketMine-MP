@@ -31,7 +31,6 @@ use pocketmine\command\RemoteConsoleCommandSender;
 use pocketmine\event\server\RemoteServerCommandEvent;
 use pocketmine\Server;
 use pocketmine\utils\TextFormat;
-use pocketmine\utils\Utils;
 
 class RCON{
 	/** @var Server */
@@ -68,9 +67,14 @@ class RCON{
 
 		socket_set_block($this->socket);
 
-		if(!@socket_create_pair(Utils::getOS() === "win" ? AF_INET : AF_UNIX, SOCK_STREAM, 0, $ipc)){
-			throw new \RuntimeException(trim(socket_strerror(socket_last_error())));
+		$ret = @socket_create_pair(AF_UNIX, SOCK_STREAM, 0, $ipc);
+		if(!$ret){
+			$err = socket_last_error();
+			if(($err !== SOCKET_EPROTONOSUPPORT and $err !== SOCKET_ENOPROTOOPT) or !@socket_create_pair(AF_INET, SOCK_STREAM, 0, $ipc)){
+				throw new \RuntimeException(trim(socket_strerror(socket_last_error())));
+			}
 		}
+
 		[$this->ipcMainSocket, $this->ipcThreadSocket] = $ipc;
 
 		$this->instance = new RCONInstance($this->socket, $this->password, $this->maxClients, $this->server->getLogger(), $this->ipcThreadSocket);
