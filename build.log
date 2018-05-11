@@ -1,0 +1,99 @@
+Running PHP lint scans on "./src/pocketmine"...
+Lint scan completed successfully.
+
+Creating ../../../DevTools.phar...
+Using stub /mnt/c/Users/Yuki/source/repos/PocketMine-MP/tests/plugins/PocketMine-DevTools/stub.php
+Adding files...
+Added 14 files
+
+Done in 0.078s
+
+Creating PocketMine-MP.phar...
+Setting entry point to src/pocketmine/PocketMine.php
+Adding files...
+Added 1081 files
+
+Done in 3.241s
+Server phar created successfully.
+[11:38:59] [Server thread/WARNING]: 
+
+
+	You are running PocketMine-MP with xdebug enabled. This has a major impact on performance.
+
+
+[11:38:59] [Server thread/INFO]: Loading pocketmine.yml...
+[11:38:59] [Server thread/INFO]: Loading server properties...
+[11:38:59] [Server thread/INFO]: Selected English (eng) as the base language
+[11:38:59] [Server thread/INFO]: Starting Minecraft: PE server version v1.5.0.1 beta
+[11:38:59] [Server thread/NOTICE]: Online mode is enabled. The server will verify that players are authenticated to Xbox Live.
+[11:38:59] [Server thread/NOTICE]: To disable authentication, set "xbox-auth" to "false" in server.properties.
+[11:38:59] [Server thread/INFO]: Opening server on 0.0.0.0:19132
+[11:38:59] [Asynchronous Worker #1 thread/DEBUG]: Set memory limit to 1024 MB
+[11:38:59] [Server thread/DEBUG]: Server unique id: 58d75828-46a4-c12b-208c-679583948c77
+[11:38:59] [Asynchronous Worker #2 thread/DEBUG]: Set memory limit to 1024 MB
+[11:38:59] [Server thread/DEBUG]: Machine unique id: f1a0cd8a-1405-b2b5-650d-aac6d9b61f79
+[11:38:59] [Server thread/INFO]: This server is running PocketMine-MP version 1.7dev
+[11:38:59] [Server thread/INFO]: PocketMine-MP is distributed under the LGPL License
+[11:39:00] [Server thread/DEBUG]: Resource packs path /mnt/c/Users/Yuki/source/repos/PocketMine-MP/test_data/resource_packs/ does not exist, creating directory
+[11:39:00] [Server thread/INFO]: Loading resource packs...
+[11:39:00] [Server thread/DEBUG]: Successfully loaded 0 resource packs
+[11:39:00] [Server thread/INFO]: Loading DevTools v1.12.10
+[11:39:00] [Server thread/INFO]: Enabling DevTools v1.12.10
+[11:39:00] [Server thread/INFO]: Loading source plugin TesterPlugin v0.0.1
+[11:39:00] [Server thread/INFO]: [DevTools] Registered folder plugin loader
+[11:39:00] [Server thread/NOTICE]: Level "world" not found
+[11:39:00] [RakLibServer thread/DEBUG]: An E_WARNING error happened: "socket_set_option(): unable to set socket option [22]: Invalid argument" in "/vendor/pocketmine/raklib/server/UDPServerSocket" at line 39
+[11:39:00] [RakLibServer thread/DEBUG]: #0 /vendor/pocketmine/raklib/server/UDPServerSocket(39): socket_set_option()
+[11:39:00] [RakLibServer thread/DEBUG]: #1 /vendor/pocketmine/raklib/server/RakLibServer(227): raklib\server\UDPServerSocket->__construct()
+[11:39:00] [RakLibServer thread/DEBUG]: #2 /vendor/pocketmine/raklib/server/RakLibServer(0): raklib\server\RakLibServer->run()
+[11:39:00] [Server thread/INFO]: Preparing level "world"
+[11:39:00] [Server thread/NOTICE]: Spawn terrain for level "world" is being generated in the background
+[11:39:00] [Server thread/INFO]: Enabling TesterPlugin v0.0.1
+[11:39:01] [Server thread/INFO]: Starting GS4 status listener
+[11:39:01] [Server thread/INFO]: Setting query port to 19132
+[11:39:01] [Server thread/INFO]: Query running on 0.0.0.0:19132
+[11:39:01] [Server thread/INFO]: Default game type: Survival Mode
+[11:39:01] [Server thread/INFO]: Done (1.32s)! For help, type "help" or "?"
+[11:39:01] [Server thread/NOTICE]: [TesterPlugin] Running test #1 (AsyncTask memory leak after completion)
+[11:39:01] [Server thread/DEBUG]: [AutoUpdater] Async update check failed due to "Channel not found"
+[11:39:18] [Server thread/NOTICE]: [TesterPlugin] Finished test #1 (AsyncTask memory leak after completion): PASS
+[11:39:18] [Server thread/NOTICE]: [TesterPlugin] Running test #2 (Items should still be equal after NBT serialize/deserialize)
+[11:39:19] [Server thread/NOTICE]: [TesterPlugin] Finished test #2 (Items should still be equal after NBT serialize/deserialize): PASS
+[11:39:19] [Server thread/NOTICE]: [TesterPlugin] Running test #3 (MainLogger::getLogger() works in AsyncTasks)
+[11:39:19] [Asynchronous Worker #2 thread/INFO]: Testing
+[11:39:20] [Server thread/NOTICE]: [TesterPlugin] Finished test #3 (MainLogger::getLogger() works in AsyncTasks): PASS
+[11:39:20] [Server thread/NOTICE]: [TesterPlugin] Running test #4 (Test registering new block types)
+[11:39:21] [Server thread/NOTICE]: [TesterPlugin] Finished test #4 (Test registering new block types): PASS
+[11:39:21] [Server thread/NOTICE]: [TesterPlugin] Running test #5 (Test overriding block types with custom ones)
+[11:39:22] [Server thread/NOTICE]: [TesterPlugin] Finished test #5 (Test overriding block types with custom ones): PASS
+[11:39:22] [Server thread/NOTICE]: [TesterPlugin] Running test #6 (Test Block::get() behaviour)
+[11:39:23] [Server thread/NOTICE]: [TesterPlugin] Finished test #6 (Test Block::get() behaviour): PASS
+[11:39:23] [Server thread/NOTICE]: [TesterPlugin] Running test #7 (Check for invalid block light filter levels)
+[11:39:24] [Server thread/NOTICE]: [TesterPlugin] Finished test #7 (Check for invalid block light filter levels): PASS
+[11:39:24] [Server thread/NOTICE]: [TesterPlugin] Running test #8 (Test ItemFactory::isRegistered() works on registered blocks)
+[11:39:25] [Server thread/NOTICE]: [TesterPlugin] Finished test #8 (Test ItemFactory::isRegistered() works on registered blocks): PASS
+[11:39:25] [Server thread/NOTICE]: [TesterPlugin] Running test #9 (Test block names are correctly defined)
+[11:39:26] [Server thread/NOTICE]: [TesterPlugin] Finished test #9 (Test block names are correctly defined): PASS
+[11:39:26] [Server thread/NOTICE]: [TesterPlugin] All tests finished, stopping the server
+[11:39:26] [Server thread/DEBUG]: Disabling all plugins
+[11:39:26] [Server thread/INFO]: Disabling DevTools v1.12.10
+[11:39:26] [Server thread/INFO]: Disabling TesterPlugin v0.0.1
+[11:39:26] [Server thread/DEBUG]: Unloading all levels
+[11:39:26] [Server thread/INFO]: Unloading level "world"
+[11:39:26] [Server thread/DEBUG]: Removing event handlers
+[11:39:26] [Server thread/DEBUG]: Stopping all tasks
+[11:39:26] [Server thread/DEBUG]: Closing console
+[11:39:26] [Server thread/DEBUG]: Stopping network interfaces
+[11:39:26] [Server thread/DEBUG]: Stopping network interface pocketmine\network\mcpe\RakLibInterface
+[11:39:26] [Server thread/DEBUG]: Collecting cycles
+[11:39:26] [Server thread/INFO]: Stopping other threads
+[11:39:26] [Server thread/DEBUG]: Stopping Console thread
+[11:39:26] [Server thread/DEBUG]: Console thread stopped successfully.
+[11:39:26] [Server thread/DEBUG]: Stopping Asynchronous Worker #1 thread
+[11:39:26] [Server thread/DEBUG]: Asynchronous Worker #1 thread stopped successfully.
+[11:39:26] [Server thread/DEBUG]: Stopping Asynchronous Worker #2 thread
+[11:39:26] [Server thread/DEBUG]: Asynchronous Worker #2 thread stopped successfully.
+[11:39:26] [Server thread/DEBUG]: Stopping Server Killer thread
+
+Took too long to stop, server was killed forcefully!
+All tests passed
